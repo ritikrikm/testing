@@ -1,0 +1,32 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.container {
+  border: 2px solid blue;
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 250px 1fr;
+}
+.container.open {
+  grid-template-columns: 250px 1fr;
+}
+.container.collapsed {
+  grid-template-columns: 80px 1fr;
+}
+.container.open {
+  grid-template-columns: 250px 1fr;
+}
+.drawer {
+  border: 2px solid green;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.container-content {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid red;
+}
