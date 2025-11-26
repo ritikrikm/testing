@@ -1,3 +1,16 @@
-.success-container {
+.toast-container {
+  position: fixed;
+  /* top: 0;
+  right: 0; */
+  inset: 50%;
+  margin: 8px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: end;
+}
+
+.toast {
   border: 8px solid saddlebrown;
+  background-color: saddlebrown;
+  color: white;
 }

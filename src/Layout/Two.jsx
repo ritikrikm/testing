@@ -1,26 +1,23 @@
 import { useState } from "react";
 import "./popupcontainer.css";
-/*
-Requirements: Creating a toast container to show successfull message only
-Assigned to ClientServerWala
-*/
-export const Two = () => {
-  const [openModal, setOpenModal] = useState(false);
+import { PopUp } from "../Modal/PopUp";
 
-  const modal = () => handleToast();
-  const handleToast = () => {
-    return (
-      <div className="toast">
-        <h3>SuccesFull Messaged Poped up</h3>
-      </div>
-    );
-  };
+import { useToast } from "../API/toast";
+export const Two = () => {
+  const [open, setOpen] = useState(false);
+  const { success, fail } = useToast();
+
   return (
     <div className="popup-container">
-      <button onClick={() => modal && setOpenModal((prev) => !prev)}>
-        Toast-Success
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="toast-element"
+      >
+        PopUp
       </button>
-      {openModal && modal()}
+      {open ? <PopUp setOpen={setOpen} /> : null}
+      <button onClick={() => success("Applied")}>Toast-S</button>
+      <button onClick={() => fail("fail")}>Toast-F</button>
     </div>
   );
 };
