@@ -11,7 +11,7 @@ export const Two = () => {
   const handleToast = () => {
     return (
       <div className="toast">
-        <h3>SuccessFull</h3>
+        <h3>SuccesFull Messaged Poped up</h3>
       </div>
     );
   };
