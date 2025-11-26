@@ -1,6 +1,6 @@
 export const Toast = ({ message }) => {
   return (
-    <div>
+    <div className="toast-container">
       <div>{message} toasted</div>
     </div>
   );
