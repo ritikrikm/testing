@@ -1,0 +1,28 @@
+name: Job Apply Browser
+
+on:
+  push:
+    branches: [job-apply-bot]
+    paths:
+      - '.github/workflows/job-apply.yml'
+      - 'jobbot/**'
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install browser
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run Clio browser inspection
+        run: node jobbot/inspect-clio.js
