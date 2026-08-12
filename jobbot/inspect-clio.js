@@ -15,6 +15,10 @@ async function openApplication(page) {
   await page.locator('#name--legalName--firstName').waitFor({state:'visible',timeout:30000});
 }
 
+async function visibleOptions(page){
+  return await page.locator('[role="option"]').evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();const s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';}).map(e=>({text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' '),label:e.getAttribute('aria-label'),selected:e.getAttribute('aria-selected')})).filter(x=>x.text));
+}
+
 (async()=>{
   const browser=await chromium.launch({channel:'chrome',headless:true});
   const page=await browser.newPage({viewport:{width:1440,height:1400}});
@@ -27,18 +31,17 @@ async function openApplication(page) {
 
   const jobItem=page.locator('[role="option"]').filter({hasText:/^Job Sites$/}).last();
   await jobItem.waitFor({state:'visible',timeout:10000});
-  const html=await jobItem.evaluate(e=>e.outerHTML);
-  console.log('JOB_SITES_HTML='+html.replace(/\s+/g,' '));
+  const prompt=jobItem.locator('[data-automation-id="promptOption"]');
+  await prompt.click({force:true});
+  await page.waitForTimeout(700);
 
-  const descendants=await jobItem.locator('*').evaluateAll(els=>els.map((e,i)=>({i,tag:e.tagName,role:e.getAttribute('role'),aid:e.getAttribute('data-automation-id'),aria:e.getAttribute('aria-label'),label:e.getAttribute('data-automation-label'),tab:e.getAttribute('tabindex'),text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' ').slice(0,180)})).filter(x=>x.role||x.aid||x.aria||x.label));
-  console.log('JOB_SITES_DESC='+JSON.stringify(descendants));
+  console.log('AFTER_PROMPT_OPTIONS='+JSON.stringify(await visibleOptions(page)));
+  console.log('SOURCE_BODY='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
 
-  // Try the most specific nested interactive element, if Workday provides one.
-  const nestedButtons=jobItem.locator('button, [data-automation-id="promptOption"]');
-  console.log('NESTED_COUNT='+await nestedButtons.count());
-  for(let i=0;i<await nestedButtons.count();i++){
-    console.log(`NESTED_${i}=`+JSON.stringify(await nestedButtons.nth(i).evaluate(e=>({tag:e.tagName,aid:e.getAttribute('data-automation-id'),aria:e.getAttribute('aria-label'),text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' ')}))));
-  }
+  const back=page.locator('[data-automation-id="promptBackButton"], [data-automation-id="promptNavBackButton"]');
+  console.log('BACK_COUNT='+await back.count());
+  const allText=(await page.locator('body').innerText()).replace(/\s+/g,' ');
+  console.log('BODY_SNIP='+allText.slice(0,2600));
 
   await browser.close();
 })().catch(e=>{console.error(e.stack||e);process.exit(1)});
