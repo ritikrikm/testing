@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 
 const URL = 'https://clio.wd3.myworkdayjobs.com/en-US/ClioCareerSite/job/Graphic-Designer--5-Month-Contract-_REQ-5082';
 
@@ -38,5 +38,3 @@ const URL = 'https://clio.wd3.myworkdayjobs.com/en-US/ClioCareerSite/job/Graphic
   console.log('LABELS_JSON=' + JSON.stringify(labels));
   await browser.close();
 })().catch(e=>{console.error(e.stack||e);process.exit(1)});
-
-// Trigger isolated browser run after workflow creation.
