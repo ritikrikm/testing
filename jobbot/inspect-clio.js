@@ -2,58 +2,61 @@ import { chromium } from 'playwright';
 
 const URL = 'https://clio.wd3.myworkdayjobs.com/en-US/ClioCareerSite/job/Graphic-Designer--5-Month-Contract-_REQ-5082';
 
-(async () => {
-  const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1400 } });
-  page.setDefaultTimeout(30000);
-
-  const badResponses = [];
-  const failedRequests = [];
-  page.on('response', r => { if (r.status() >= 400) badResponses.push({status:r.status(),url:r.url().slice(0,300)}); });
-  page.on('requestfailed', r => failedRequests.push({url:r.url().slice(0,300),error:r.failure()?.errorText}));
-  page.on('console', msg => { if (['error','warning'].includes(msg.type())) console.log(`BROWSER_${msg.type().toUpperCase()}=${msg.text().slice(0,500)}`); });
-
-  const res = await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  console.log('HTTP_STATUS=' + (res && res.status()));
-
+async function openApplication(page) {
+  await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const apply = page.locator('[data-automation-id="adventureButton"]');
   await apply.waitFor({state:'visible', timeout:30000});
-  console.log('JOB_LOADED=' + (await page.locator('[data-automation-id="jobPostingHeader"]').innerText()).trim());
-  console.log('POSTED=' + (await page.locator('[data-automation-id="postedOn"]').innerText()).trim());
+  console.log('JOB='+(await page.locator('[data-automation-id="jobPostingHeader"]').innerText()).trim());
+  console.log('POSTED='+(await page.locator('[data-automation-id="postedOn"]').innerText()).replace(/\s+/g,' ').trim());
   await apply.click();
-
-  const manual = page.getByRole('button', { name: /apply manually/i });
-  await manual.waitFor({state:'visible', timeout:15000});
+  const manual=page.getByRole('button',{name:/apply manually/i});
+  await manual.waitFor({state:'visible',timeout:15000});
   await manual.click();
-  console.log('MANUAL_APPLICATION_OPENED');
+  await page.locator('#name--legalName--firstName').waitFor({state:'visible',timeout:30000});
+}
 
-  for (let sec=0; sec<30; sec++) {
-    await page.waitForTimeout(1000);
-    const body=(await page.locator('body').innerText()).replace(/\s+/g,' ');
-    const textboxes=await page.getByRole('textbox').count();
-    const autos=await page.locator('[data-automation-id]').count();
-    if (sec % 5 === 4) console.log(`WAIT_${sec+1}s textboxes=${textboxes} autos=${autos} body=${body.slice(0,1000)}`);
-    if (textboxes>0 || /First Name|Legal Name|Email Address|Phone|Country/i.test(body)) break;
+async function visibleChoices(page, label) {
+  await page.waitForTimeout(500);
+  const choices=await page.locator('[role="option"], [data-automation-id="promptOption"], [data-automation-id="promptOptionText"]').evaluateAll(els=>els.filter(e=>{
+    const s=getComputedStyle(e); const r=e.getBoundingClientRect(); return s.visibility!=='hidden'&&s.display!=='none'&&r.width>0&&r.height>0;
+  }).map(e=>({tag:e.tagName,role:e.getAttribute('role'),aid:e.getAttribute('data-automation-id'),text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' ')})).filter(x=>x.text));
+  console.log(label+'='+JSON.stringify(choices.slice(0,150)));
+}
+
+(async()=>{
+  const browser=await chromium.launch({channel:'chrome',headless:true});
+  const page=await browser.newPage({viewport:{width:1440,height:1400}});
+  page.setDefaultTimeout(30000);
+  await openApplication(page);
+
+  console.log('STEP1_BODY='+(await page.locator('body').innerText()).replace(/\s+/g,' ').slice(0,2500));
+
+  // Source multi-select.
+  const source=page.locator('#source--source');
+  await source.click();
+  await visibleChoices(page,'SOURCE_CHOICES');
+  await source.fill('Job');
+  await visibleChoices(page,'SOURCE_FILTERED_CHOICES');
+  await page.keyboard.press('Escape');
+
+  // Country dropdown.
+  const country=page.locator('[data-automation-id="formField-country"] button');
+  await country.click();
+  await visibleChoices(page,'COUNTRY_CHOICES');
+  const canada=page.getByText('Canada',{exact:true}).last();
+  console.log('CANADA_VISIBLE='+(await canada.isVisible().catch(()=>false)));
+  if(await canada.isVisible().catch(()=>false)) await canada.click(); else await page.keyboard.press('Escape');
+
+  await page.waitForTimeout(700);
+  const state=page.locator('[data-automation-id="formField-countryRegion"] button');
+  if(await state.count()){
+    await state.click();
+    await visibleChoices(page,'STATE_CHOICES');
+    await page.keyboard.press('Escape');
   }
 
-  console.log('APPLICATION_URL=' + page.url());
-  const body=(await page.locator('body').innerText()).replace(/\s+/g,' ');
-  console.log('FINAL_BODY=' + body.slice(0,7000));
-  console.log('BAD_RESPONSES=' + JSON.stringify(badResponses.slice(-50)));
-  console.log('FAILED_REQUESTS=' + JSON.stringify(failedRequests.slice(-50)));
-
-  const automation = await page.locator('[data-automation-id]').evaluateAll(els => els.map((el,i)=>({
-    i,tag:el.tagName,aid:el.getAttribute('data-automation-id'),role:el.getAttribute('role'),type:el.getAttribute('type'),aria:el.getAttribute('aria-label'),placeholder:el.getAttribute('placeholder'),text:(el.innerText||el.textContent||'').trim().replace(/\s+/g,' ').slice(0,220)
-  })).filter(x=>x.aid));
-  console.log('AUTOMATION_JSON=' + JSON.stringify(automation));
-
-  for (const role of ['textbox','combobox','radio','checkbox']) {
-    const loc=page.getByRole(role);
-    console.log(`ROLE_${role.toUpperCase()}_COUNT=${await loc.count()}`);
-    for(let i=0;i<Math.min(await loc.count(),30);i++){
-      console.log(`ROLE_${role.toUpperCase()}_${i}=`+JSON.stringify(await loc.nth(i).evaluate(e=>({tag:e.tagName,id:e.id,name:e.getAttribute('name'),aid:e.getAttribute('data-automation-id'),aria:e.getAttribute('aria-label'),placeholder:e.getAttribute('placeholder'),value:e.value||null})).catch(()=>({}))));
-    }
-  }
-  console.log('BUTTONS=' + JSON.stringify((await page.getByRole('button').allTextContents()).map(x=>x.trim()).filter(Boolean)));
+  console.log('AFTER_COUNTRY_BODY='+(await page.locator('body').innerText()).replace(/\s+/g,' ').slice(0,3000));
+  const inputs=await page.locator('input').evaluateAll(els=>els.map(e=>({id:e.id,name:e.name,type:e.type,placeholder:e.placeholder,value:e.value})).filter(x=>x.id||x.name));
+  console.log('INPUTS='+JSON.stringify(inputs));
   await browser.close();
 })().catch(e=>{console.error(e.stack||e);process.exit(1)});
