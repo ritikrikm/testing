@@ -18,29 +18,8 @@ async function openApplication(page) {
 async function dumpVisibleOptions(page,label){
   const opts=await page.locator('[role="option"]').evaluateAll(els=>els.filter(e=>{
     const r=e.getBoundingClientRect(); const s=getComputedStyle(e); return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden';
-  }).map(e=>({
-    text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' '),
-    aid:e.getAttribute('data-automation-id'),
-    label:e.getAttribute('data-automation-label'),
-    ariaSelected:e.getAttribute('aria-selected')
-  })).filter(x=>x.text));
+  }).map(e=>({text:(e.innerText||e.textContent||'').trim().replace(/\s+/g,' '),ariaSelected:e.getAttribute('aria-selected')})).filter(x=>x.text));
   console.log(label+'='+JSON.stringify(opts));
-}
-
-async function domClickVisibleOption(page,text){
-  const clicked=await page.evaluate((wanted)=>{
-    const candidates=[...document.querySelectorAll('[role="option"]')];
-    const el=candidates.find(e=>{
-      const t=(e.innerText||e.textContent||'').trim().replace(/\s+/g,' ');
-      const r=e.getBoundingClientRect(); const s=getComputedStyle(e);
-      return t===wanted && r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden';
-    });
-    if(!el) return false;
-    el.click();
-    return true;
-  },text);
-  console.log(`DOM_CLICK_${text.replace(/\W+/g,'_')}=${clicked}`);
-  if(!clicked) throw new Error(`Visible Workday option not found: ${text}`);
 }
 
 (async()=>{
@@ -51,16 +30,22 @@ async function domClickVisibleOption(page,text){
 
   const source=page.locator('#source--source');
   await source.click({force:true});
-  await page.waitForTimeout(350);
-  await dumpVisibleOptions(page,'SOURCE_LEVEL1');
+  await source.fill('Job Sites');
+  await page.waitForTimeout(650);
+  await dumpVisibleOptions(page,'SOURCE_FILTERED');
+  await source.press('ArrowDown');
+  await source.press('Enter');
+  await page.waitForTimeout(800);
 
-  await domClickVisibleOption(page,'Job Sites');
-  await page.waitForTimeout(700);
-  await dumpVisibleOptions(page,'SOURCE_AFTER_JOB_SITES');
-  console.log('SOURCE_FIELD_BODY='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
+  console.log('SOURCE_VALUE='+(await source.inputValue()));
+  console.log('SOURCE_BODY='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
+  await dumpVisibleOptions(page,'SOURCE_AFTER_ENTER');
+  console.log('SELECTED_ITEMS='+JSON.stringify(await page.locator('[data-automation-id="selectedItem"], [data-automation-id="multiSelectPill"]').allTextContents().catch(()=>[])));
 
-  const sourceHtml=await page.locator('[data-automation-id="formField-source"]').evaluate(e=>e.outerHTML.slice(0,15000));
-  console.log('SOURCE_HTML='+sourceHtml.replace(/\s+/g,' '));
+  await source.press('Escape').catch(()=>{});
+  await page.locator('#name--legalName--firstName').focus();
+  await page.waitForTimeout(400);
+  console.log('SOURCE_AFTER_CLOSE='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
 
   await browser.close();
 })().catch(e=>{console.error(e.stack||e);process.exit(1)});
