@@ -15,27 +15,47 @@ async function openApplication(page) {
   await page.locator('#name--legalName--firstName').waitFor({state:'visible',timeout:30000});
 }
 
-async function optionByLabel(page,label){
-  let opt=page.locator(`[data-automation-id="promptOption"][data-automation-label="${label}"]`).last();
-  if(!(await opt.count())) opt=page.getByText(label,{exact:true}).last();
-  await opt.waitFor({state:'visible',timeout:12000});
-  return opt;
+async function visibleSearch(page) {
+  const inputs=page.locator('input[placeholder="Search"]');
+  for(let i=(await inputs.count())-1;i>=0;i--){
+    if(await inputs.nth(i).isVisible().catch(()=>false)) return inputs.nth(i);
+  }
+  return null;
+}
+
+async function exactRoleOption(page,label){
+  let opt=page.getByRole('option',{name:label,exact:true}).last();
+  if(await opt.count() && await opt.isVisible().catch(()=>false)) return opt;
+  opt=page.locator(`[role="option"] [data-automation-label="${label}"], [role="option"][data-automation-label="${label}"]`).last();
+  if(await opt.count()) return opt;
+  return page.getByText(label,{exact:true}).last();
 }
 
 async function chooseSingle(page,parentAid,label){
   const button=page.locator(`[data-automation-id="${parentAid}"] button`).first();
   await button.click({force:true});
-  await (await optionByLabel(page,label)).click({force:true});
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(300);
+  const search=await visibleSearch(page);
+  if(search){ await search.fill(label); await page.waitForTimeout(450); }
+  const opt=await exactRoleOption(page,label);
+  await opt.waitFor({state:'visible',timeout:12000});
+  await opt.click({force:true});
+  await page.waitForTimeout(350);
+  console.log(`${parentAid}_SELECTED=${(await button.innerText()).trim()}`);
 }
 
 async function selectSource(page,label){
   const source=page.locator('#source--source');
   await source.click({force:true});
-  const opt=await optionByLabel(page,label);
+  await page.waitForTimeout(300);
+  const opt=await exactRoleOption(page,label);
+  await opt.waitFor({state:'visible',timeout:12000});
   await opt.click({force:true});
+  // Workday keeps multi-select open; explicitly close by Escape + blur + focus next field.
   await page.keyboard.press('Escape').catch(()=>{});
-  await page.waitForTimeout(400);
+  await source.evaluate(e=>e.blur()).catch(()=>{});
+  await page.locator('#name--legalName--firstName').click({force:true});
+  await page.waitForTimeout(350);
   const txt=(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' ');
   console.log('SOURCE_SELECTED='+txt);
 }
@@ -64,7 +84,6 @@ async function dumpCurrentStep(page,label){
   await chooseSingle(page,'formField-countryRegion','Ontario');
   await page.locator('#emailAddress--emailAddress').fill('Visualartist.prerna@gmail.com');
 
-  // Phone is optional; fill it if Workday has finished rendering the field.
   await page.waitForTimeout(1200);
   const phoneInput=page.locator('input[name*="phone" i], input[id*="phone" i]').first();
   if(await phoneInput.count()) {
@@ -76,7 +95,6 @@ async function dumpCurrentStep(page,label){
   const next=page.locator('[data-automation-id="pageFooterNextButton"]');
   await next.click();
 
-  // Wait for step 2 or validation errors.
   await page.waitForTimeout(2500);
   const body=(await page.locator('body').innerText()).replace(/\s+/g,' ');
   console.log('AFTER_NEXT_URL='+page.url());
