@@ -27,6 +27,22 @@ async function dumpVisibleOptions(page,label){
   console.log(label+'='+JSON.stringify(opts));
 }
 
+async function domClickVisibleOption(page,text){
+  const clicked=await page.evaluate((wanted)=>{
+    const candidates=[...document.querySelectorAll('[role="option"]')];
+    const el=candidates.find(e=>{
+      const t=(e.innerText||e.textContent||'').trim().replace(/\s+/g,' ');
+      const r=e.getBoundingClientRect(); const s=getComputedStyle(e);
+      return t===wanted && r.width>0 && r.height>0 && s.display!=='none' && s.visibility!=='hidden';
+    });
+    if(!el) return false;
+    el.click();
+    return true;
+  },text);
+  console.log(`DOM_CLICK_${text.replace(/\W+/g,'_')}=${clicked}`);
+  if(!clicked) throw new Error(`Visible Workday option not found: ${text}`);
+}
+
 (async()=>{
   const browser=await chromium.launch({channel:'chrome',headless:true});
   const page=await browser.newPage({viewport:{width:1440,height:1400}});
@@ -38,13 +54,12 @@ async function dumpVisibleOptions(page,label){
   await page.waitForTimeout(350);
   await dumpVisibleOptions(page,'SOURCE_LEVEL1');
 
-  const jobSites=page.getByRole('option',{name:'Job Sites',exact:true}).last();
-  await jobSites.click({force:true});
-  await page.waitForTimeout(600);
+  await domClickVisibleOption(page,'Job Sites');
+  await page.waitForTimeout(700);
   await dumpVisibleOptions(page,'SOURCE_AFTER_JOB_SITES');
   console.log('SOURCE_FIELD_BODY='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
 
-  const sourceHtml=await page.locator('[data-automation-id="formField-source"]').evaluate(e=>e.outerHTML.slice(0,12000));
+  const sourceHtml=await page.locator('[data-automation-id="formField-source"]').evaluate(e=>e.outerHTML.slice(0,15000));
   console.log('SOURCE_HTML='+sourceHtml.replace(/\s+/g,' '));
 
   await browser.close();
