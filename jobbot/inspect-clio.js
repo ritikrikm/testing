@@ -30,22 +30,29 @@ async function dumpVisibleOptions(page,label){
 
   const source=page.locator('#source--source');
   await source.click({force:true});
-  await source.fill('Job Sites');
-  await page.waitForTimeout(650);
-  await dumpVisibleOptions(page,'SOURCE_FILTERED');
-  await source.press('ArrowDown');
-  await source.press('Enter');
-  await page.waitForTimeout(800);
+  await source.fill('');
+  await page.waitForTimeout(300);
+  await dumpVisibleOptions(page,'SOURCE_LEVEL1');
 
-  console.log('SOURCE_VALUE='+(await source.inputValue()));
-  console.log('SOURCE_BODY='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
-  await dumpVisibleOptions(page,'SOURCE_AFTER_ENTER');
-  console.log('SELECTED_ITEMS='+JSON.stringify(await page.locator('[data-automation-id="selectedItem"], [data-automation-id="multiSelectPill"]').allTextContents().catch(()=>[])));
+  // Workday search does not filter this prompt; Job Sites is the fourth category.
+  for(let i=0;i<4;i++) await source.press('ArrowDown');
+  await source.press('Enter');
+  await page.waitForTimeout(700);
+  console.log('SOURCE_BODY_AFTER_SELECT='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
+  await dumpVisibleOptions(page,'SOURCE_AFTER_SELECT');
 
   await source.press('Escape').catch(()=>{});
-  await page.locator('#name--legalName--firstName').focus();
-  await page.waitForTimeout(400);
-  console.log('SOURCE_AFTER_CLOSE='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
+  await page.locator('#name--legalName--firstName').click();
+  await page.waitForTimeout(350);
+  console.log('SOURCE_BODY_CLOSED='+(await page.locator('[data-automation-id="formField-source"]').innerText()).replace(/\s+/g,' '));
+
+  const countryButton=page.locator('[data-automation-id="formField-country"] button').first();
+  await countryButton.click();
+  await page.waitForTimeout(500);
+  console.log('COUNTRY_BUTTON='+(await countryButton.innerText()).trim());
+  await dumpVisibleOptions(page,'COUNTRY_OPTIONS');
+  const searches=await page.locator('input[placeholder="Search"]').evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}).map(e=>({id:e.id,value:e.value,aid:e.getAttribute('data-automation-id')})));
+  console.log('VISIBLE_SEARCHES='+JSON.stringify(searches));
 
   await browser.close();
 })().catch(e=>{console.error(e.stack||e);process.exit(1)});
